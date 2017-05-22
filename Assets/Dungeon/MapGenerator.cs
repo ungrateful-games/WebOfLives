@@ -297,6 +297,8 @@ public class MapGenerator : MonoBehaviour {
                     break; 
                 case CellTypes.RightWall: // RightWall
                     //startCell = cellIndex - 1;
+
+                    // FIXME there might be an out of bounds thing here.
                     endCell   = cellIndex + 1;
 
                     break;
@@ -312,8 +314,9 @@ public class MapGenerator : MonoBehaviour {
 
             }
 
-            if (endCell > 0)
+            if (endCell < this.Cells.Length && endCell > 0)
             {
+                // Out of Range exception was found.
                 endVal = this.Cells[endCell];
                 //startVal = this.Cells[startCell];
 
