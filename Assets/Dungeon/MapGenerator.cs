@@ -20,14 +20,16 @@ public enum CellTypes
 public class MapGenerator : MonoBehaviour {
     
     public const byte BEDROCK   = 0;
-    public const byte ROOM      = 1;
-    public const byte CORRIDOR  = 2;
-    public const byte TOP       = 4;
-    public const byte RIGHT     = 8;
-    public const byte BOTTOM    = 16;
-    public const byte LEFT      = 32;
-    public const byte WALL      = 64;
-    public const byte NOPASS    = 128;
+
+    public const byte NOPASS    = 1;
+    public const byte ROOM      = 2;
+    public const byte CORRIDOR  = 4;
+    public const byte WALL      = 8;
+
+    public const byte TOP       = 16;
+    public const byte RIGHT     = 32;
+    public const byte BOTTOM    = 64;
+    public const byte LEFT      = 128;
 
     [SerializeField]
     public GameObject TileMapPrefab;
