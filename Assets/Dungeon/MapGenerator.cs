@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
+
 public enum CellTypes
 {
     Bedrock   = 0,
@@ -17,6 +18,17 @@ public enum CellTypes
 
 
 public class MapGenerator : MonoBehaviour {
+    
+    public const byte BEDROCK   = 0;
+    public const byte ROOM      = 1;
+    public const byte CORRIDOR  = 2;
+    public const byte TOP       = 4;
+    public const byte RIGHT     = 8;
+    public const byte BOTTOM    = 16;
+    public const byte LEFT      = 32;
+    public const byte WALL      = 64;
+    public const byte NOPASS    = 128;
+
     [SerializeField]
     public GameObject TileMapPrefab;
     // TODO 
@@ -27,13 +39,15 @@ public class MapGenerator : MonoBehaviour {
     public int MaxMapSegmentHeight = 100;  //: The maximum height of a map segment in tiles.
 
     public int NumRooms = 30; // The number of rooms to generate.
-    public int MinRoomWidth  = 4;
-    public int MinRoomHeight = 4;
-    public int RoomVarianceX = 10;
-    public int RoomVarianceY = 10;
+    public int MinRoomWidth  = 3;
+    public int MinRoomHeight = 3;
+    public int RoomVarianceX = 9;
+    public int RoomVarianceY = 9;
+
 
     public CellTypes[] Cells; // The contents of the map cells, independent of number of segments.
 
+    public int sparseness = 2;
 
     public TileMap[] MapSegments;   // An Array of map segments, may not be needed ? XXX
     private int SegCountX = 0;
@@ -92,8 +106,7 @@ public class MapGenerator : MonoBehaviour {
             HeightRemaining -= MaxMapSegmentHeight;
         }
         #endregion
-
-
+        
         this.GenerateDungeon();
     }
 
@@ -101,9 +114,31 @@ public class MapGenerator : MonoBehaviour {
     {
         this.Cells = new CellTypes[MapWidth * MapHeight]; // Default set to zero ("Bedrock").
 
-        while(this.NumRooms-- > 0)
+        byte[] maskedCells = new byte[MapHeight * MapWidth]; // Build the initial "design" for the map.
+
+        #region SealEdge
+        // Prevent the edges of the map from hosting cells the user can enter.
+        for(int y = 0, index = 0; y < MapHeight; y++)
         {
-            PlaceRoom();
+            index = y * MapWidth;
+            if (y > 0 || y < MapHeight - 1)
+            {
+                maskedCells[index] = NOPASS; // "Left wall"
+                maskedCells[index + MapWidth - 1] = NOPASS; // "Right Wall"
+            }
+            else
+            {
+                for (int x = 0; x < MapWidth; x++, index++)
+                {
+                    maskedCells[index] = NOPASS; 
+                }
+            }
+        }
+        #endregion
+
+        while (this.NumRooms-- > 0)
+        {
+            PlaceRoom(ref maskedCells);
         }
 
         // Generate the corridors.
@@ -155,57 +190,104 @@ public class MapGenerator : MonoBehaviour {
         Map.SetMeshTexture(texture);
     }
 
-    public void PlaceRoom()
+    public void PlaceRoom(ref byte[] maskedCells)
     {
         // Find out where the rooms belong first.
-        int roomX = (int)(Random.value * (MapWidth - MinRoomWidth)) + 1;
-        int roomY = (int)(Random.value * (MapHeight - MinRoomHeight)) + 1;
+        #region GenRoom
+        // Compute an odd numbered starting location.
+        int roomX = (int)(Random.value * (MapWidth  - 3 - MinRoomWidth )) + 3;
+        int roomY = (int)(Random.value * (MapHeight - 3 - MinRoomHeight)) + 3;
 
-        int widthMax  = (int)(Random.value * (RoomVarianceX)) + MinRoomWidth + roomX;
-        int heightMax = (int)(Random.value * (RoomVarianceY))  + MinRoomHeight + roomY;
+        if ( roomX % 2 == 0 )  roomX += 1;
+        if ( roomY % 2 == 0 )  roomY += 1;
 
         int x = roomX, y = roomY;
 
-        // FIXME clean this code up.
-        widthMax  = widthMax  >= MapWidth  ?   MapWidth - 1 : widthMax;
-        heightMax = heightMax >= MapHeight ?  MapHeight - 1 : heightMax;
+        // Compute an odd numbered room width (they always need to be odd for consistency.
+        int roomWidth  = (int)(Random.value * (RoomVarianceX)) + MinRoomWidth;
+        int roomHeight = (int)(Random.value * (RoomVarianceY)) + MinRoomHeight;
 
+        if (roomWidth  % 2 == 0) roomX += 1;
+        if (roomHeight % 2 == 0) roomY += 1;
+
+        int roomXMax  = Mathf.Min(roomWidth  + roomX, MapWidth - 3);
+        int roomYMax  = Mathf.Min(roomHeight + roomY, MapWidth - 3);
+        #endregion
+
+        #region RoomPlacement
         bool validRoom = true;
 
         // Place the rooms.
-        for (; y < heightMax && validRoom; y++)
+        for (; y < roomYMax && validRoom; y++)
         {
-            for (x = roomX; x < widthMax && validRoom; x++)
+            for (x = roomX; x < roomXMax && validRoom; x++)
             {
-                validRoom = validRoom && (this.Cells[y * MapWidth + x] == CellTypes.Bedrock);
-
-                this.Cells[ y * MapWidth + x ] = CellTypes.Room;
+                validRoom = validRoom && (maskedCells[y * MapWidth + x] == BEDROCK);
+                maskedCells[ y * MapWidth + x ] |= ROOM;
             }
         }
 
-        // If the room was invalid, revert the touched rooms
-        if (!validRoom)
-        {
-            for (y--, x -= 2; y >= roomY; y--)
-            {
-                for (; x >= roomX; x--)
-                {
-                    this.Cells[y * MapWidth + x] = CellTypes.Bedrock;
+        #endregion
+
+        #region RoomValidation
+        // FIXME THIS IS BROKEN?
+        // If the room was valid place the room walls.
+        // Else the room was invalid, revert the touched rooms
+        if (validRoom)
+        { 
+            int index = 0;
+            byte roomType = 0;
+            for (y = roomY; y < roomYMax; y++) {
+
+                index = y * MapWidth + roomX;
+
+                if (y > roomY || y < roomYMax) {
+                    maskedCells[index] = ROOM | WALL | LEFT; // "Left wall"
+                    maskedCells[index + MapWidth - 1] = ROOM | WALL | RIGHT; // "Right Wall"
                 }
-                x = widthMax - 1;
+                else {
+                    // Set the room type
+                    if (y == roomY) roomType = ROOM | WALL | BOTTOM;
+                    else roomType = ROOM | WALL | TOP;
+
+                    for (x = roomX; x < roomXMax; x++, index++) 
+                        maskedCells[index] = roomType;                    
+                }
             }
+
+            // TODO build the room obj
         }
+        else
+        { 
+            for (y--, x -= 2; y >= roomY; y--, x = roomXMax - 1)
+                for (; x >= roomX; x--)
+                    maskedCells[y * MapWidth + x] = BEDROCK;
+        }
+
+        #endregion
     }
 
     void ScanCorridors()
     {
         List<int> Walls = new List<int>(this.Cells.Length);
 
-        for(int index =0; index< this.Cells.Length; ++index )
+        int yMax = this.MapHeight - 1;
+        int xMax = this.MapWidth - 1;
+        for(int y = 2, index = this.MapWidth + 1; y < yMax; ++y)
         {
-            if (this.Cells[index] == CellTypes.Bedrock)
-                PlaceCorridors(index, Walls);
+            for(int x = 2; x < xMax; ++x, ++index )
+            {
+                if (this.Cells[index] == CellTypes.Bedrock)
+                    PlaceCorridors(index, Walls);
+            }
         }
+
+        /*
+        for(int pass = 0; pass < this.sparseness; ++pass)
+        {
+            SparsifyCorridors();
+        }
+        */
 
     }
 
@@ -314,10 +396,23 @@ public class MapGenerator : MonoBehaviour {
 
             }
 
-            if (endCell < this.Cells.Length && endCell > 0)
+            if ( endCell > 0)
             {
                 // Out of Range exception was found.
-                endVal = this.Cells[endCell];
+                try
+                {
+                    endVal = this.Cells[endCell];
+                }
+                catch 
+                {
+                    // Edge case for right wall failure detected.
+                    // Looks like the logic check doesn't work.
+                    Debug.Log("EndCell: "  + endCell); //EndCell: 22500
+                    Debug.Log("CellIndex: " + cellIndex); // CellIndex: 22499
+                    Debug.Log("Wall: " + wallValue); //Wall: RightWall
+                    Walls.RemoveAt(targetWall);
+                    continue;
+                }
                 //startVal = this.Cells[startCell];
 
                 // If the end value is bedrock, we can generate.
@@ -326,6 +421,8 @@ public class MapGenerator : MonoBehaviour {
                     // Populate the walls flanking the corridor we're skipping.
                     if (wallValue == CellTypes.UpWall || wallValue == CellTypes.DownWall)
                     {
+                        // FIXME this logic doesn't always work!
+
                         if ((cellIndex + 1) % this.MapWidth != 0 &&
                             this.Cells[cellIndex + 1] == CellTypes.Bedrock)
                         {
@@ -406,7 +503,82 @@ public class MapGenerator : MonoBehaviour {
         }
     }
 
+    void SparsifyCorridors()
+    {
+        int cellIndex, upIndex, downIndex, leftIndex, rightIndex, adjCorridors, safeIndex = -1;
+        for( int y = 0; y < this.MapHeight; ++y)
+        {
+            for(int x = 0; x< this.MapWidth; ++x)
+            {
+                cellIndex = y * this.MapWidth + x;
+                if (this.Cells[cellIndex] != CellTypes.Corridor) continue;
 
+                adjCorridors = 0;
+
+                if (y < (this.MapHeight -1))
+                {            
+                    upIndex = cellIndex + this.MapWidth;
+                    
+                    if(this.Cells[upIndex] == CellTypes.Room || this.Cells[upIndex] == CellTypes.Corridor )
+                    {
+                        adjCorridors++;
+                        safeIndex = upIndex;
+                    }
+                }
+                else
+                    upIndex = -1;
+
+                if (y > 0)
+                {
+                    downIndex = cellIndex - this.MapWidth;
+
+                    if (this.Cells[downIndex] == CellTypes.Room || this.Cells[downIndex] == CellTypes.Corridor)
+                    {
+                        adjCorridors++;
+                        safeIndex = downIndex;
+                    }
+                }
+                else
+                    downIndex = -1;
+
+
+                if( x > 0 )
+                {
+                    leftIndex = cellIndex - 1;
+
+                    if (this.Cells[leftIndex] == CellTypes.Room || this.Cells[leftIndex] == CellTypes.Corridor)
+                    {
+                        adjCorridors++;
+                        safeIndex = leftIndex;
+                    }
+                }
+                else
+                    leftIndex = -1;
+
+                if (x < (this.MapWidth -1))
+                {
+                    rightIndex = cellIndex + 1;
+
+                    if (this.Cells[rightIndex] == CellTypes.Room || this.Cells[rightIndex] == CellTypes.Corridor)
+                    {
+                        adjCorridors++;
+                        safeIndex = rightIndex;
+                    }
+                }
+                else
+                    rightIndex = -1;
+
+                if( adjCorridors <= 1 )
+                {
+                    if (upIndex >= 0 && safeIndex != upIndex) this.Cells[upIndex] = CellTypes.Bedrock;
+                    if (downIndex >= 0 && safeIndex != downIndex) this.Cells[downIndex] = CellTypes.Bedrock;
+                    if (rightIndex >= 0 && safeIndex != rightIndex) this.Cells[rightIndex] = CellTypes.Bedrock;
+                    if (leftIndex >= 0 && safeIndex != leftIndex) this.Cells[leftIndex] = CellTypes.Bedrock;
+                }
+            }
+        }
+
+    }
     // Use this for initialization
     void Start () {
         InitMap();
