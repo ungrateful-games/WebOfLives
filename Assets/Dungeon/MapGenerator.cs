@@ -27,15 +27,14 @@ public class MapGenerator : MonoBehaviour {
     public const int CORRIDOR = 0x4;
     public const int WALL = 0x8;
 
-    public const int CELL_TYPE = NOPASS | ROOM | CORRIDOR | WALL;
-    public const int MAZE_TERM = NOPASS | ROOM | CORRIDOR;
 
     // Wall Direction.
-    public const int TOP = 0x10;
-    public const int RIGHT = 0x20;
-    public const int BOTTOM = 0x40;
-    public const int LEFT = 0x80;
+    public const int TOP       = 0x10;
+    public const int RIGHT     = 0x20;
+    public const int BOTTOM    = 0x40;
+    public const int LEFT      = 0x80;
     public const int DIRECTION = TOP | RIGHT | BOTTOM | LEFT;
+    public const int DIR_CLEAR = ~DIRECTION;
 
     // Wall Metadata. 
     public const int DOOR  = 0x100;
@@ -60,7 +59,8 @@ public class MapGenerator : MonoBehaviour {
     public const int PLACE_HOLDER15 = 0x400000;
     public const int PLACE_HOLDER16 = 0x800000;
 
-    public const int GROUP_MASK = 0xFF >> 24;
+    public const int GROUP_SHIFT = 16;
+    public const int GROUP_MASK = 0xFF << GROUP_SHIFT;
     public const int GROUP_CLEAR = ~GROUP_MASK;
 
     // Byte 4: Meta data           
@@ -72,7 +72,11 @@ public class MapGenerator : MonoBehaviour {
     public const int PLACE_HOLDER21 = 0x10000000;
     public const int PLACE_HOLDER22 = 0x20000000;
     public const int PLACE_HOLDER23 = 0x40000000;
-    public const int PLACE_HOLDER24 = 1 >> 32;
+    public const int PLACE_HOLDER24 = 1 << 32;
+
+    // HELPER MASKs
+    public const int CELL_TYPE = NOPASS | ROOM | CORRIDOR | WALL;
+    public const int MAZE_TERM = IN_MAZE | CORRIDOR | ROOM | NOPASS;
 
 
 
@@ -81,13 +85,13 @@ public class MapGenerator : MonoBehaviour {
     public GameObject TileMapPrefab;
     // TODO 
     [Tooltip("Width of the map in tiles.")]
-    public int MapWidth = 150; //: The width of the map to be generated in tiles.
+    public int MapWidth = 99; //: The width of the map to be generated in tiles.
 
     [Tooltip("Heght of the map in tiles.")]
-    public int MapHeight = 150; //: The height of the map to be generated in tiles.
+    public int MapHeight = 99; //: The height of the map to be generated in tiles.
 
-    public int MaxMapSegmentWidth = 100;   //: The maximum width of a map segment in tiles.
-    public int MaxMapSegmentHeight = 100;  //: The maximum height of a map segment in tiles.
+    public const int MaxMapSegmentWidth = 149;   //: The maximum width of a map segment in tiles.
+    public const int MaxMapSegmentHeight = 149;  //: The maximum height of a map segment in tiles.
 
     public int MaxNumRooms = 30; // The number of rooms to generate.
     public int MinRoomWidth  = 3;
@@ -110,6 +114,9 @@ public class MapGenerator : MonoBehaviour {
 
     public void InitMap()
     {
+        if (this.MapHeight % 2 == 1) this.MapHeight+=1;
+        if (this.MapWidth % 2 == 1) this.MapWidth += 1;
+
         // TODO move somewhere else.
         this.TileMappings = new Vector2[Tileset.width * Tileset.height];
         for(int y = this.TileResolution, index = 0; y <= Tileset.height; y+=this.TileResolution)
@@ -243,7 +250,7 @@ public class MapGenerator : MonoBehaviour {
         // Place the rooms.
         for (; y < roomYMax && validRoom; ++y)
         {
-            for (x = roomX,  index = y * MapWidth + x; x < roomXMax && validRoom; ++x, ++index)
+            for (x = roomX -1,  index = y * MapWidth + x; x < roomXMax && validRoom; ++x, ++index)
             {
                 validRoom = validRoom && (this.MaskedCells[index] == BEDROCK);
                 this.MaskedCells[index] |= ROOM | IN_MAZE;
@@ -255,6 +262,7 @@ public class MapGenerator : MonoBehaviour {
         // FIXME THIS IS BROKEN?
         // If the room was valid place the room walls.
         // Else the room was invalid, revert the touched rooms
+        // FIXME The 
         if (validRoom)
         { 
             index = 0;
@@ -297,13 +305,12 @@ public class MapGenerator : MonoBehaviour {
         int yMax = this.MapHeight - 1;
         int xMax = this.MapWidth - 1;
         
-        for (int y = 1; y < yMax; ++y)
+        for (int y = 1; y < yMax; y+=2)
         {
-            for(int x = 1, index = y * this.MapWidth + 1 ; x < xMax; ++x, ++index )
+            for(int x = 1, index = y * this.MapWidth + 1 ; x < xMax; x+=2, index+=2 )
             {
                 if (this.MaskedCells[index] == BEDROCK)
                     PlaceCorridors(index,ref Walls);
-                //return;
             }
         }
 
@@ -320,37 +327,44 @@ public class MapGenerator : MonoBehaviour {
     // Masks horizontally and adds the walls to the list if needed.
     void MaskHorizontal(int index, ref List<int> Walls)
     {
-        if ((this.MaskedCells[index - 1] & IN_MAZE) == BEDROCK)
+        if ((this.MaskedCells[index - 1] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index - 1);
+            this.MaskedCells[index - 1] |= WALL | IN_MAZE;
+
         }
-        this.MaskedCells[index - 1] |= LEFT | WALL | IN_MAZE;
+        this.MaskedCells[index - 1] |= LEFT;
         
 
-        if ((this.MaskedCells[index + 1] & IN_MAZE) == BEDROCK)
+        if ((this.MaskedCells[index + 1] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index + 1);
+            this.MaskedCells[index + 1] |= WALL | IN_MAZE;
+
         }
-        this.MaskedCells[index + 1] |= RIGHT | WALL | IN_MAZE;
+        this.MaskedCells[index + 1] |= RIGHT;
     }
 
     // TODO Probably some optimization that can be done to this code.
     // MasksVertically and adds the walls to the list if needed.
     void MaskVertical(int index, ref List<int> Walls)
     {
-        if ((this.MaskedCells[index + this.MapWidth] & IN_MAZE) == BEDROCK)
+        if ((this.MaskedCells[index + this.MapWidth] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index + this.MapWidth);
+            this.MaskedCells[index + this.MapWidth] |=  WALL | IN_MAZE;
+
         }
-        this.MaskedCells[index + this.MapWidth] |= TOP | WALL | IN_MAZE;
+        this.MaskedCells[index + this.MapWidth] |= TOP;
         
 
         // This Mask test does not work, need to improve.
-        if ((this.MaskedCells[index - this.MapWidth] & IN_MAZE) == BEDROCK)
+        if ((this.MaskedCells[index - this.MapWidth] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index - this.MapWidth);
+            this.MaskedCells[index - this.MapWidth] |= WALL | IN_MAZE;
         }
-        this.MaskedCells[index - this.MapWidth] |= BOTTOM | WALL | IN_MAZE;
+        this.MaskedCells[index - this.MapWidth] |= BOTTOM;
         
     }
 
@@ -360,16 +374,17 @@ public class MapGenerator : MonoBehaviour {
         // Since this is a spanning tree I think this might work?
         // FIXME do the math John.
         // TODO optimize this data structure.
-        this.MaskedCells[corridor] = CORRIDOR | IN_MAZE;
+        this.MaskedCells[corridor] = CORRIDOR ;
 
         #region BuildStartWalls
         // For corridors and rooms we don't care if they're directional, but we can use that in the future.
-        MaskHorizontal(corridor,ref Walls);
-        MaskVertical(corridor, ref Walls);
+        MaskHorizontal(corridor, ref Walls);
+        MaskVertical(corridor,   ref Walls);
+        Debug.Log(Walls.Count);
         #endregion
 
-        int endCell;
-        int wallValue, dir;
+        int junctCellIndex;
+        int dir;
         int maxCount = 0;
 
         // While there are "Unexplored Walls" iterate.
@@ -378,57 +393,60 @@ public class MapGenerator : MonoBehaviour {
             //Debug.Log(Walls.Count);
             // Get a random wall first.
             int targetWall = (int)(Random.value * (Walls.Count - 1));
-            int cellIndex = Walls[targetWall];
+            int wallIndex = Walls[targetWall];
+            
 
             // Cache the wall value and extract the direction encoded.
-            wallValue = this.MaskedCells[cellIndex];
-            dir = (byte)(wallValue & DIRECTION);
+            dir =(this.MaskedCells[wallIndex] & DIRECTION);
 
             switch (dir)
             {
                 case LEFT:
-                    endCell = cellIndex - 1;
+                    junctCellIndex = wallIndex - 1;
                     break;
                 case RIGHT:
-                    endCell = cellIndex + 1;
+                    junctCellIndex = wallIndex + 1;
                     break;
                 case TOP:
-                    endCell = cellIndex + this.MapWidth;
+                    junctCellIndex = wallIndex + this.MapWidth;
                     break;
                 case BOTTOM:
-                    endCell = cellIndex - this.MapWidth;
+                    junctCellIndex = wallIndex - this.MapWidth;
                     break;
                 default:
-                    endCell = -1;
+                    junctCellIndex = -1;
                     break;
             }
-
-            // TODO this algorithm isn't a "True maze". It is somewhat sparse.
+            // Conceptually this works, but the walls get lost.
+            //Debug.Log("Direction: " + dir + " CellIndex: " + junctCellIndex + " ");
             // If the Direction was found continue.
-            if ( endCell > 0 )
+            // If the direction was valid and the end cell is not already in the maze.
+            if ( junctCellIndex > 0  && (this.MaskedCells[junctCellIndex] & (CORRIDOR | NOPASS) ) == BEDROCK)
             {
-                // Mark this cell as a corridor and as in the maze.
-                this.MaskedCells[cellIndex] = CORRIDOR | IN_MAZE;
+                // Set the wall to be a corridors.
+                this.MaskedCells[wallIndex] = CORRIDOR;
 
-                // Add the old walls for this cell to the frontier.
+                // Set the borders of the new hallway.
                 if ((dir & (LEFT | RIGHT)) != 0)
                 {
-                    MaskHorizontal(cellIndex, ref Walls);
-                    MaskVertical(cellIndex, ref Walls);
+                    this.MaskedCells[wallIndex - this.MapWidth] |= BOTTOM | WALL | IN_MAZE;
+                    this.MaskedCells[wallIndex + this.MapWidth] |=    TOP | WALL | IN_MAZE;
                 }
                 else
                 {
-                    MaskHorizontal(cellIndex, ref Walls);
-                    MaskVertical(cellIndex, ref Walls);
+                    this.MaskedCells[wallIndex + 1] |= RIGHT | WALL | IN_MAZE;
+                    this.MaskedCells[wallIndex - 1] |=  LEFT | WALL | IN_MAZE;
                 }
 
-                // TODO FIX This, not a true maze
-                // If the endcell isn't allready marked for exploration add it.
-                if ((this.MaskedCells[endCell] & (IN_MAZE | NOPASS)) == BEDROCK)
-                {
-                    Walls.Add(endCell);
-                    this.MaskedCells[endCell] |= WALL | dir | IN_MAZE;
-                }
+                // Set the junction cell to be a corridor.
+                this.MaskedCells[junctCellIndex] = CORRIDOR;
+
+                // Add the walls of the junction to the frontier, iff they aren't already there.
+                MaskHorizontal(junctCellIndex, ref Walls);
+                MaskVertical(junctCellIndex, ref Walls);
+
+                // Clear out the direction from above, 2 more assignments, but I think it's quicker than a branch.
+                this.MaskedCells[wallIndex] &= DIR_CLEAR;
             }
             maxCount = Mathf.Max(Walls.Count, maxCount);
             Walls.RemoveAt(targetWall);
@@ -521,8 +539,8 @@ public class MapGenerator : MonoBehaviour {
         // Get the tile meap
         TileMap Map = this.MapSegments[segY * this.SegCountX + segX];
 
-        int xStart = segX * this.MaxMapSegmentWidth;
-        int x, y = segY * this.MaxMapSegmentHeight;
+        int xStart = segX * MapGenerator.MaxMapSegmentWidth;
+        int x, y = segY * MapGenerator.MaxMapSegmentHeight;
 
         int xMax = xStart + Map.TileCountX;
         int yMax = y + Map.TileCountY;
