@@ -34,7 +34,6 @@ public class MapGenerator : MonoBehaviour {
     public const int BOTTOM    = 0x40;
     public const int LEFT      = 0x80;
     public const int DIRECTION = TOP | RIGHT | BOTTOM | LEFT;
-    public const int DIR_CLEAR = ~DIRECTION;
 
     // Wall Metadata. 
     public const int DOOR  = 0x100;
@@ -77,6 +76,8 @@ public class MapGenerator : MonoBehaviour {
     // HELPER MASKs
     public const int CELL_TYPE = NOPASS | ROOM | CORRIDOR | WALL;
     public const int MAZE_TERM = IN_MAZE | CORRIDOR | ROOM | NOPASS;
+    public const int CLEAR_WALL = ~(DIRECTION | WALL);
+
 
 
 
@@ -331,19 +332,15 @@ public class MapGenerator : MonoBehaviour {
         if ((this.MaskedCells[index - 1] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index - 1);
-            this.MaskedCells[index - 1] |= WALL | IN_MAZE;
-
         }
-        this.MaskedCells[index - 1] |= LEFT;
-        
+        this.MaskedCells[index - 1] |= LEFT | WALL | IN_MAZE;
+
 
         if ((this.MaskedCells[index + 1] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index + 1);
-            this.MaskedCells[index + 1] |= WALL | IN_MAZE;
-
         }
-        this.MaskedCells[index + 1] |= RIGHT;
+        this.MaskedCells[index + 1] |= RIGHT | WALL | IN_MAZE;
     }
 
     // TODO Probably some optimization that can be done to this code.
@@ -353,20 +350,17 @@ public class MapGenerator : MonoBehaviour {
         if ((this.MaskedCells[index + this.MapWidth] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index + this.MapWidth);
-            this.MaskedCells[index + this.MapWidth] |=  WALL | IN_MAZE;
-
         }
-        this.MaskedCells[index + this.MapWidth] |= TOP;
-        
+        this.MaskedCells[index + this.MapWidth] |= TOP | WALL | IN_MAZE;
+
 
         // This Mask test does not work, need to improve.
         if ((this.MaskedCells[index - this.MapWidth] & MAZE_TERM) == BEDROCK)
         {
             Walls.Add(index - this.MapWidth);
-            this.MaskedCells[index - this.MapWidth] |= WALL | IN_MAZE;
         }
-        this.MaskedCells[index - this.MapWidth] |= BOTTOM;
-        
+        this.MaskedCells[index - this.MapWidth] |= BOTTOM | WALL | IN_MAZE;
+
     }
 
 
@@ -447,7 +441,7 @@ public class MapGenerator : MonoBehaviour {
                 MaskVertical(junctCellIndex, ref Walls);
 
                 // Clear out the direction from above, 2 more assignments, but I think it's quicker than a branch.
-                this.MaskedCells[wallIndex] &= DIR_CLEAR;
+                this.MaskedCells[wallIndex] &= CLEAR_WALL;
             }
             maxCount = Mathf.Max(Walls.Count, maxCount);
             Walls.RemoveAt(targetWall);
