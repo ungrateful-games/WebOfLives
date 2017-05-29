@@ -226,19 +226,19 @@ public class MapGenerator : MonoBehaviour {
         // TODO NEED 
         // Horizontal
         int roomX = (int)(Random.value * (MapWidth - 4 - MinRoomWidth)) + 2;
-        if (roomX % 2 == 1) roomX += 1;
+        if (roomX % 2 == 0) roomX++;
 
         int roomWidth = (int)(Random.value * (RoomVarianceX)) + MinRoomWidth;
-        if (roomWidth % 2 == 0) roomWidth += 1;
+        if (roomWidth % 2 == 0) roomWidth++;
         int roomXMax  = Mathf.Min(roomWidth  + roomX, MapWidth - 2);
         roomWidth = roomXMax - roomX;
 
         //  Vertical
         int roomY = (int)(Random.value * (MapHeight - 4 - MinRoomHeight)) + 2;
-        if (roomY % 2 == 1) roomY += 1;
+        if (roomY % 2 == 0) roomY++;
 
         int roomHeight = (int)(Random.value * (RoomVarianceY)) + MinRoomHeight;
-        if (roomHeight % 2 == 0) roomHeight += 1;
+        if (roomHeight % 2 == 0) roomHeight++;
         int roomYMax  = Mathf.Min(roomHeight + roomY, MapWidth - 2);
         roomHeight = roomYMax - roomY;
         #endregion
@@ -247,10 +247,11 @@ public class MapGenerator : MonoBehaviour {
         #region RoomPlacement
         bool validRoom = true;
         int x = roomX, y = roomY, index = 0;
-        // Place the rooms.
+
+
         for (; y < roomYMax && validRoom; ++y)
         {
-            for (x = roomX -1,  index = y * MapWidth + x; x < roomXMax && validRoom; ++x, ++index)
+            for (x = roomX,  index = y * MapWidth + x; x < roomXMax && validRoom; ++x, ++index)
             {
                 validRoom = validRoom && (this.MaskedCells[index] == BEDROCK);
                 this.MaskedCells[index] |= ROOM | IN_MAZE;
@@ -421,7 +422,7 @@ public class MapGenerator : MonoBehaviour {
             //Debug.Log("Direction: " + dir + " CellIndex: " + junctCellIndex + " ");
             // If the Direction was found continue.
             // If the direction was valid and the end cell is not already in the maze.
-            if ( junctCellIndex > 0  && (this.MaskedCells[junctCellIndex] & (CORRIDOR | NOPASS) ) == BEDROCK)
+            if ( junctCellIndex > 0  && (this.MaskedCells[junctCellIndex] & (CORRIDOR | NOPASS | ROOM) ) == BEDROCK)
             {
                 // Set the wall to be a corridors.
                 this.MaskedCells[wallIndex] = CORRIDOR;
