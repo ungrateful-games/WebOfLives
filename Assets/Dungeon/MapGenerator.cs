@@ -80,7 +80,8 @@ public class MapGenerator : MonoBehaviour {
 
 
 
-
+    [SerializeField]
+    public DungeonPacker Dungeon;
 
     [Tooltip("The tile Map Object that will render the map.")]
     public GameObject TileMapPrefab;
@@ -115,6 +116,8 @@ public class MapGenerator : MonoBehaviour {
 
     public void InitMap()
     {
+        this.Dungeon.GenerateDungeon();
+        /*
         if (this.MapHeight % 2 == 1) this.MapHeight+=1;
         if (this.MapWidth % 2 == 1) this.MapWidth += 1;
 
@@ -166,6 +169,7 @@ public class MapGenerator : MonoBehaviour {
         #endregion
         
         this.GenerateDungeon();
+        */
     }
 
     public void GenerateDungeon()
