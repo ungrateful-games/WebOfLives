@@ -116,9 +116,92 @@ public class BinRoom
     }
 }
 
+public class SpatialRoomHash
+{
+    List<Room>[] Cells;
+    int CellWidth;
+    int CellHeight;
+    int Rows;
+    int Cols;
+
+    public SpatialRoomHash( int BoundaryWidth, int BoundaryHeight, int GridWidth, int GridHeight )
+    {
+        this.CellWidth  = GridWidth;
+        this.CellHeight = GridHeight;
+        this.Cols = Mathf.CeilToInt(BoundaryWidth / GridWidth);
+        this.Rows = Mathf.CeilToInt(BoundaryHeight / GridHeight);
+
+        this.Cells = new List<Room>[this.Cols * this.Rows];
+    }
+
+    private int hash( float x, float y)
+    {
+        return (int)(y/this.CellHeight)  * this.Cols + (int)(x / this.CellWidth);
+    }
+
+    private bool collides(ref Room room, int index)
+    {
+        bool collision = false;
+        List<Room> CellRooms = this.Cells[index];
+
+        for (int i = 0; i < CellRooms.Count && !collision; ++i)
+        {
+            collision |= CellRooms[i].Dimensions.Overlaps(room.Dimensions);
+        }
+
+        return collision;
+    }
+
+    private bool insert(ref Room value)
+    {
+        bool allowed = true;
+        int corner_a = this.hash(value.Dimensions.xMin, value.Dimensions.yMin);
+        int corner_b = this.hash(value.Dimensions.xMax, value.Dimensions.yMax);
+
+        // The rectangle fits in one cell.
+        if (corner_a == corner_b)
+        {
+            allowed = !this.collides(ref value, corner_a);
+
+            if (allowed)
+            {
+                this.Cells[corner_a].Add(value);
+            }
+        }
+        else
+        {
+            allowed |= (!this.collides(ref value, corner_a) || !this.collides(ref value, corner_b) );
+
+            int corner_c = this.hash(value.Dimensions.xMax, value.Dimensions.yMin);
+
+            // If the top edge is in the same spatial index, just insert the room into the two slots (if allowed.)
+            if (allowed && corner_a == corner_c)
+            {
+                this.Cells[corner_a].Add(value);
+                this.Cells[corner_b].Add(value);
+            }
+            else if(allowed)
+            {
+                int corner_d = this.hash(value.Dimensions.xMin, value.Dimensions.yMax);
+                allowed |= (!this.collides(ref value, corner_c) || !this.collides(ref value, corner_d));
+
+                if(allowed)
+                {
+                    this.Cells[corner_a].Add(value);
+                    this.Cells[corner_b].Add(value);
+                    this.Cells[corner_c].Add(value);
+                    this.Cells[corner_d].Add(value);
+                }
+            }
+        }
+        return allowed;
+    }
+}
+
 [System.Serializable]
 public class DungeonPacker
 {
+
     private BinRoom RootRoom;
 
     [SerializeField]
@@ -172,6 +255,7 @@ public class DungeonPacker
             placementGen = new System.Random(this.PlaceSeed);
         else
             placementGen = new System.Random();
+
 
         this.RootRoom = new BinRoom(this.RoomOffsetX, this.RoomOffsetY, this.Width - (2 * this.RoomOffsetX), this.Height - (2 *this.RoomOffsetY), false);
 
