@@ -133,13 +133,15 @@ public class MapGenerator : MonoBehaviour {
 
         this.MaskedCells = new int[this.Dungeon.Height * this.Dungeon.Width];
 
-        for (int i = this.Dungeon.Rooms.Length - 1; i >= 0; --i)
+        for (int i = this.Dungeon.Rooms.Count - 1; i >= 0; --i)
         {
-            BinRoom Room = this.Dungeon.Rooms[i];
+            Room Room = this.Dungeon.Rooms[i];
 
-            for (int y = Room.H + Room.Y -1; y >= Room.Y ; --y)
+            for (int y = (int)(Room.Dimensions.height + Room.Dimensions.y -1); y >= (int)Room.Dimensions.y ; --y)
             {
-                for (int x = Room.W + Room.X -1, index = y * this.Dungeon.Width + x; x >= Room.X && index >0 && index < this.MaskedCells.Length; --x, --index)
+                for (int x = (int)(Room.Dimensions.width + Room.Dimensions.x - 1), index = y * this.Dungeon.Width + x; 
+                    x >= Room.Dimensions.x && index >0 && index < this.MaskedCells.Length; 
+                    --x, --index)
                 {
                     this.MaskedCells[index] = ROOM;
                 }

@@ -131,7 +131,12 @@ public class SpatialRoomHash
         this.Cols = Mathf.CeilToInt(BoundaryWidth / GridWidth);
         this.Rows = Mathf.CeilToInt(BoundaryHeight / GridHeight);
 
+        // Populate the cells with lists.
         this.Cells = new List<Room>[this.Cols * this.Rows];
+        for (int i = 0; i < this.Cells.Length; ++i)
+        {
+            this.Cells[i] = new List<Room>();
+        }
     }
 
     private int hash( float x, float y)
@@ -152,7 +157,7 @@ public class SpatialRoomHash
         return collision;
     }
 
-    private bool insert(ref Room value)
+    public bool insert(Room value)
     {
         bool allowed = true;
         int corner_a = this.hash(value.Dimensions.xMin, value.Dimensions.yMin);
@@ -202,10 +207,10 @@ public class SpatialRoomHash
 public class DungeonPacker
 {
 
-    private BinRoom RootRoom;
+    //private BinRoom RootRoom;
 
     [SerializeField]
-    public BinRoom[] Rooms;
+    public List<Room> Rooms;
 
     [SerializeField]
     public int Width = 50;
@@ -257,30 +262,70 @@ public class DungeonPacker
             placementGen = new System.Random();
 
 
-        this.RootRoom = new BinRoom(this.RoomOffsetX, this.RoomOffsetY, this.Width - (2 * this.RoomOffsetX), this.Height - (2 *this.RoomOffsetY), false);
+        //this.RootRoom = new BinRoom(this.RoomOffsetX, this.RoomOffsetY, this.Width - (2 * this.RoomOffsetX), this.Height - (2 *this.RoomOffsetY), false);
 
-        int areaConsumed = 0, roomCount = 0, failureCount = 0;
+        int room_id = 0;
         int areaTotal = this.Width * this.Height;
 
-        // Populate the dungeon with a bin packing algorithm.
-        for (roomCount = 0, failureCount = 0; roomCount < this.NumRooms && failureCount < this.MaxFailureCount; ++roomCount)
+        // XXX Maybe a Balanced Tree might be better?
+        // XXX Heap, do a heapsort and insert into the spatial hash and a standalone array? 
+        // Create a new list of rooms with the total desired room count.
+        this.Rooms = new List<Room>(this.NumRooms);
+        for (room_id = 0; room_id < this.NumRooms; ++room_id)
         {
-            int roomWidth = placementGen.Next( this.RoomWidthMin, this.RoomWidthMax) ;
-            int roomHeight = placementGen.Next(this.RoomHeightMin, this.RoomHeightMax);
-            int roomArea   = roomWidth * roomHeight;
-
-            // Sanity checker.
-            if ( areaConsumed + roomArea <= areaTotal && 
-                this.RootRoom.PlaceRoom(roomWidth, roomHeight, this.RoomOffsetX, this.RoomOffsetY))
-            {
-                areaConsumed += roomArea;
-            }
-            else
-            {
-                failureCount++;
-            }
+            // TODO Generate the positions here too.
+            // TODO the widths need to be modified.
+            // Generate a new room with a randomized dimension.
+            this.Rooms.Insert(room_id, new Room(
+                    room_id,
+                    placementGen.Next(this.RoomWidthMin, this.RoomWidthMax),
+                    placementGen.Next(this.RoomHeightMin, this.RoomHeightMax)));
         }
 
+        // Sort based on the "Room Weight", or area, smallest first.
+        this.Rooms.Sort(delegate (Room a, Room b)
+        {
+            return b.CompareTo(a);
+        });
+
+        // Make a new spatial hash with the room dimensions the maximum value of the room size
+        // TODO Tune?
+        SpatialRoomHash RoomMap = new SpatialRoomHash(this.Width, this.Height, this.RoomWidthMax, this.RoomHeightMax);
+
+        // Add the rooms to the spatial hash, largest area first, and try to pack it as tightly as possible.
+        for (int i = room_id-1; i >= 0; --i)
+        {
+            Rect RoomDimension = this.Rooms[i].Dimensions;
+            int failures = 0;
+            bool success = false;
+            do
+            {
+                // Generate the room coordinate, add 1 to the base offsets so we can force odd numbered room placements.
+                // TODO ensure widths are regular.
+                // Might as well do some collision resolution.
+                int x = placementGen.Next( this.RoomOffsetX + 1, (int)(this.Width  - RoomDimension.width  - this.RoomOffsetX ) );
+                if (x % 2 == 0) x--;
+
+                int y = placementGen.Next( this.RoomOffsetY + 1, (int)(this.Height - RoomDimension.height - this.RoomOffsetY ) );
+                if (y % 2 == 0) y--;
+
+                this.Rooms[i].MoveRoom(x, y);
+                Debug.Log("i:" + i + " " + this.Rooms[i].Dimensions.ToString());
+
+                success =  true;//RoomMap.insert(this.Rooms[i]);
+            } while (!success && failures++ < this.MaxFailureCount );
+
+
+            // If the room failed, remove it.
+            if(!success)
+            {
+                Debug.Log("Removing room");
+                this.Rooms.RemoveAt(i);
+            }
+            
+        }
+
+        /*
         Debug.Log("Available Area: " + areaTotal + " AreaConsumed: " + areaConsumed + " Area Unpacked: " + (areaTotal - areaConsumed) + " Rooms: " + roomCount + " Failures: " + failureCount);
 
         // Populate an array of rooms for speedier/simpler access.
@@ -290,6 +335,7 @@ public class DungeonPacker
             this.Rooms = new BinRoom[createdRooms];
             this.RootRoom.PopulateArray(ref this.Rooms, 0);
         }
+        */
     }
 
 
