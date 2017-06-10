@@ -137,10 +137,10 @@ public class MapGenerator : MonoBehaviour {
         {
             Room Room = this.Dungeon.Rooms[i];
 
-            for (int y = (int)(Room.Dimensions.height + Room.Dimensions.y -1); y >= (int)Room.Dimensions.y ; --y)
+            for (int y = (int)(Room.Dimensions.yMax -1); y >= (int)Room.Dimensions.yMin ; --y)
             {
-                for (int x = (int)(Room.Dimensions.width + Room.Dimensions.x - 1), index = y * this.Dungeon.Width + x; 
-                    x >= Room.Dimensions.x && index >0 && index < this.MaskedCells.Length; 
+                for (int x = (int)(Room.Dimensions.xMax - 1), index = y * this.Dungeon.Width + x; 
+                    x >= Room.Dimensions.xMin && index >0 && index < this.MaskedCells.Length; 
                     --x, --index)
                 {
                     this.MaskedCells[index] = ROOM;
