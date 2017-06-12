@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -98,6 +99,8 @@ public class SpatialRoomHash
     }
 }
 
+
+
 [System.Serializable]
 public class DungeonPacker
 {
@@ -150,6 +153,7 @@ public class DungeonPacker
     {
         System.Random placementGen;
         System.Random testGen;
+        
         // Init the seed of the dungeon.
         if (this.PlaceSeed != -1)
         {
@@ -157,12 +161,16 @@ public class DungeonPacker
             testGen = new System.Random(this.PlaceSeed);
         }
         else
-        { 
-            placementGen = new System.Random();
-            testGen = new System.Random();
+        {
+            int random_seed = new System.Random().Next();
+            placementGen = new System.Random(random_seed);
+            testGen = new System.Random(random_seed);
+            Debug.Log("seed " + random_seed);
         }
 
-    int room_id = 0;
+
+
+        int room_id = 0;
 
 
         // XXX Maybe a Balanced Tree might be better?
@@ -203,6 +211,7 @@ public class DungeonPacker
         // Make a new spatial hash with the room dimensions the maximum value of the room size
         // TODO Tune?
         SpatialRoomHash RoomMap = new SpatialRoomHash(this.Width, this.Height, this.RoomWidthMax + 1, this.RoomHeightMax + 1);
+        Voronoi vGen = new Voronoi();
 
         // Add the rooms to the spatial hash, largest area first, and try to pack it as tightly as possible.
         //for (int i = room_id-1; i >= 0; --i)
@@ -214,6 +223,8 @@ public class DungeonPacker
             bool success = false;
             int cMaxX = maxX - (int) (this.RoomWidthMax - this.Rooms[i].Dimensions.width) ;
             int cMaxY = maxY - (int)(this.RoomHeightMax - this.Rooms[i].Dimensions.height);
+            int x = 0;
+            int y = 0;
             //Debug.Log(cMaxX + "  " + cMaxY);
             do
             {
@@ -221,10 +232,10 @@ public class DungeonPacker
                 // TODO ensure widths are regular.
                 // Might as well do some collision resolution.
                 // TODO should this be 
-                int x = testGen.Next(minX, cMaxX);
+                x = testGen.Next(minX, cMaxX);
                 if (x % 2 == 1) x--;
 
-                int y = testGen.Next(minY, cMaxY);
+                y = testGen.Next(minY, cMaxY);
                 if (y % 2 == 1) y--;
 
                 this.Rooms[i].MoveRoom(x, y);
@@ -234,8 +245,13 @@ public class DungeonPacker
             } while (!success && failures++ < this.MaxFailureCount );
 
 
-            // If the room failed, remove it.
-            if(!success)
+            // If the room was made successfully append the site event to the event queue.
+            // Else delete it.
+            if(success)
+            {
+                vGen.PushSite(x, y);
+            }
+            else
             {
                 //Debug.Log("Removing room");
                 this.Rooms.RemoveAt(i--);
@@ -244,19 +260,20 @@ public class DungeonPacker
             
         }
 
-        /*
-        Debug.Log("Available Area: " + areaTotal + " AreaConsumed: " + areaConsumed + " Area Unpacked: " + (areaTotal - areaConsumed) + " Rooms: " + roomCount + " Failures: " + failureCount);
-
-        // Populate an array of rooms for speedier/simpler access.
-        int createdRooms = roomCount - failureCount;
-        if (createdRooms > 0)
+        vGen.CreateEdges();
+        VoronoiEvent currEvent;
+        while(vEvents.Count > 0)
         {
-            this.Rooms = new BinRoom[createdRooms];
-            this.RootRoom.PopulateArray(ref this.Rooms, 0);
+            currEvent = vEvents.Pop();
         }
-        */
+
     }
 
+
+    void GenerateVoronoi()
+    {
+
+    }
 
 	
 }

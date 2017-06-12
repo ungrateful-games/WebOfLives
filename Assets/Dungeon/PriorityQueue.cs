@@ -6,17 +6,22 @@ using System.Collections.Generic;
 // Uses the min implementation of the priority queue.
 public class PriorityQueue<T> where T: System.IComparable
 {
-    List<T> Heap;
-    Comparer<T> ValueComparer;
+    List<T> _heap;
 
+    //Comparer<T> ValueComparer;
+    public int Count
+    {
+        get { return this._heap.Count; }
+    }
+    
     public PriorityQueue()
     {
-        this.Heap = new List<T>();
+        this._heap = new List<T>();
     }
 
     public void Push( T value)
     {
-        this.Heap.Add(value);
+        this._heap.Add(value);
 
     }
     public T Pop()
@@ -24,15 +29,15 @@ public class PriorityQueue<T> where T: System.IComparable
         T retValue = default(T);
         //return this.Root.Pop();
 
-        if ( this.Heap.Count > 0 )
+        if ( this._heap.Count > 0 )
         {
-            retValue = this.Heap[0];
-            this.Heap.RemoveAt(0);
+            retValue = this._heap[0];
+            this._heap.RemoveAt(0);
 
-            if(this.Heap.Count > 0)
+            if(this._heap.Count > 0)
             {
-                this.Heap[0] = this.Heap[this.Heap.Count - 1];
-                this.Heap.RemoveAt(this.Heap.Count - 1);
+                this._heap[0] = this._heap[this._heap.Count - 1];
+                this._heap.RemoveAt(this._heap.Count - 1);
             }
         }
 
@@ -42,19 +47,19 @@ public class PriorityQueue<T> where T: System.IComparable
     public void HeapRebuild(int index)
     {
         int smallestChild = 2 * index + 1;
-        if (this.Heap.Count > smallestChild)
+        if (this._heap.Count > smallestChild)
         {
-            if(this.Heap.Count > smallestChild + 1 &&
-               this.ValueComparer.Compare(this.Heap[smallestChild], this.Heap[smallestChild]) > 1)
+            if(this._heap.Count > smallestChild + 1 &&
+               this._heap[smallestChild].CompareTo(this._heap[smallestChild + 1]) > 0)
             {
                 smallestChild++;
             }
 
-            if(this.ValueComparer.Compare(this.Heap[smallestChild], this.Heap[index]) > 1)
+            if(this._heap[smallestChild].CompareTo( this._heap[index]) > 0)
             {
-                T temp = this.Heap[smallestChild];
-                this.Heap[smallestChild] = this.Heap[index];
-                this.Heap[index] = this.Heap[smallestChild];
+                T temp = this._heap[smallestChild];
+                this._heap[smallestChild] = this._heap[index];
+                this._heap[index] = this._heap[smallestChild];
 
                 this.HeapRebuild(smallestChild);
             }
@@ -71,20 +76,20 @@ public class PriorityQueue<T> where T: System.IComparable
         if(currentIndex > 0)
         {
             // This implementation aliases the heap locations.
-            T parentNode = this.Heap[currentIndex];
+            T parentNode = this._heap[currentIndex];
             T currentNode;
             do
             {
                 // Assign the nodes.
                 currentNode = parentNode;
-                parentNode = this.Heap[parentIndex];
+                parentNode = this._heap[parentIndex];
 
                 // Check to see if current node deserves to be on top more.
                 // In a max priority current node's value should be greater than parent node.
-                if (this.ValueComparer.Compare(currentNode, parentNode) > 0)
+                if (currentNode.CompareTo(parentNode) > 0)
                 {
-                    this.Heap[currentIndex] = parentNode;
-                    this.Heap[parentIndex] = currentNode;
+                    this._heap[currentIndex] = parentNode;
+                    this._heap[parentIndex] = currentNode;
 
                     currentIndex = parentIndex;
                     parentIndex  = Mathf.FloorToInt((currentIndex - 1) / 2); 
