@@ -1,51 +1,4 @@
-﻿using UnityEngine;
-using UnityEditor;
-
-public class Point2D
-{
-    public float X { get; set; }
-    public float Y { get; set; }
-
-    public Point2D(float x, float y)
-    {
-        this.X = x;
-        this.Y = y;
-    }
-}
-
-
-public class ParabolaNode
-{
-    public Point2D Point { get; set; }
-    public VoronoiEvent Event { get; set; }
-
-    public float Key
-    {
-        get { return Point.Y; }
-    }
-
-    public ParabolaNode Parent;
-    public ParabolaNode Right;
-    public ParabolaNode Left;
-    bool _isLeaf;
-    public bool Red { get; set; }
-
-    public ParabolaNode()
-    {
-        this.Point = null;
-        this._isLeaf = true;
-        this.Red = false;
-    }
-
-    public ParabolaNode(Point2D point)
-    {
-        this.Point = point;
-        this._isLeaf = false;
-        this.Red = true;
-    }
- }
-
-
+﻿
 public class Beachline
 {
     public ParabolaNode _root;
@@ -60,6 +13,83 @@ public class Beachline
     public bool IsEmpty()
     {
         return this._root == this._nil;
+    }
+
+    /**
+     * @brief The Parabolas are defined by the Leaves of the tree.
+     * 
+     * @return The leaf that most closely matches the supplied point.
+     * 
+     */
+    public ParabolaNode FindCollidedParabola(float key)
+    {
+        ParabolaNode node = this._root;
+        ParabolaNode prevNode = node;
+
+        while (node != this._nil )
+        {
+            prevNode = node;
+            if (node.Key > key) node = node.Left;
+            else node = node.Right;
+        }
+
+        return prevNode;
+
+    }
+
+    /**
+     * @brief Processes a "Site Parabola"
+     * 
+     * 1. Retrieve the Site that this Parabola should be intersecting.
+     * 2. If the event had a circle event it is set to invalid, as the queue should have processed this event before this process.
+     * 3. A new Inner Parabola must be created to signify an intersection.
+     */
+    public void AddSiteParabola(ParabolaNode newSite)
+    {
+        ParabolaNode oldSite = this.FindCollidedParabola(newSite.Key);
+
+        // Handle fake circle events (don't rip from the PQueue, just flag as bad and move along.
+        if (oldSite.CircleEvent != null) oldSite.CircleEvent.IsValid = false;
+
+        #region insert
+        // This new node should replace the oldSite in the tree.
+        ParabolaNode intersection = new ParabolaNode(); // TODO what site should this store?
+
+        // Make a valid Red Black tree to insert.
+        intersection.Red = false;
+
+        // New site is red and a leaf.
+        newSite.Red = true;
+        newSite.Left = newSite.Right = this._nil;
+
+        // Make the old site red regardless, we'll be inserting the intersection in a bit.
+        oldSite.Red = true;
+
+        // Old site is guaranteed to be a leaf.
+        if (oldSite.Parent.Right == oldSite) oldSite.Parent.Right = this._nil;
+        else oldSite.Parent.Left = this._nil;
+
+        // Assign the parents.
+        newSite.Parent = oldSite.Parent = intersection;
+
+        // Insert the nodes in the appropriate locations.
+        if ( newSite.Key > oldSite.Key ) 
+        {
+            intersection.Right = newSite;
+            intersection.Left  = oldSite;
+        }
+        else
+        {
+            intersection.Left  = newSite;
+            intersection.Right = oldSite;
+        }
+
+        // Insert the Proper Red Black Tree and let the BST balance itself.
+        this.Insert(intersection);
+        #endregion
+
+        // Need to structure the insert so the inner/leaf property is preserved.
+
     }
 
     public void Insert(ParabolaNode newNode)
@@ -98,7 +128,7 @@ public class Beachline
         ParabolaNode currTarget = fixNode;
         ParabolaNode sibling = this._nil; /// A Sentinal value for checks, this node is "black" reducing the number of checks.
 
-        while ( currTarget.Parent.Red ) 
+        while (currTarget.Parent.Red)
         {
             if (currTarget.Parent == currTarget.Parent.Parent.Left)
             {
@@ -109,7 +139,7 @@ public class Beachline
                     sibling.Red = false;
                     sibling.Parent.Red = true;
                 }
-                else 
+                else
                 {
                     if (currTarget == currTarget.Parent.Right)
                     {
@@ -153,7 +183,7 @@ public class Beachline
         ParabolaNode y = removalNode;
         bool yOrigColor = removalNode.Red;
 
-        if( removalNode.Left == this._nil)
+        if (removalNode.Left == this._nil)
         {
             x = removalNode.Right;
             this.Transplant(removalNode, removalNode.Right);
@@ -261,7 +291,7 @@ public class Beachline
                     this.LeftRotate(x.Parent);
                     x = this._root;
                 }
-            }            
+            }
         }
 
         x.Red = false;
@@ -283,7 +313,7 @@ public class Beachline
         ParabolaNode prev = this._nil;
         ParabolaNode current = tree.Left;
 
-        while(current != this._nil)
+        while (current != this._nil)
         {
             prev = current;
             current = current.Left;
@@ -297,7 +327,7 @@ public class Beachline
         ParabolaNode y = x.Right;
         x.Right = y.Left;
 
-        if(y.Left != this._nil)
+        if (y.Left != this._nil)
         {
             y.Left.Parent = x;
         }
@@ -335,77 +365,4 @@ public class Beachline
         x.Right = y;
         y.Parent = x.Parent;
     }
-}
-
-public class VoronoiEvent : System.IComparable
-{
-    public Point2D Point { get; set; }
-    public float X;
-    public bool IsSite;
-    public ParabolaNode parabola;
-
-
-    public VoronoiEvent(float x, float y, bool isSite)
-    {
-        this.Point = new Point2D(x, y);
-        this.X = x;
-        this.IsSite = isSite;
-        this.parabola = null;
-    }
-
-    // Sorts compare to sorts lowest to highest deliberately.
-    public int CompareTo(object obj)
-    {
-        return Mathf.CeilToInt(((VoronoiEvent)obj).X - this.X);
-    }
-}
-
-
-
-public class Voronoi 
-{
-    PriorityQueue<VoronoiEvent> _events;
-    Beachline _beachLine;
-
-
-    public Voronoi()
-    {
-        this._events = new PriorityQueue<VoronoiEvent>();
-        this._beachLine = new Beachline();
-    }
-
-    public void PushSite(int x, int y)
-    {
-        this._events.Push(new VoronoiEvent(x, y, true));
-    }
-
-    public void CreateEdges()
-    {
-        while(this._events.Count > 0)
-        {
-            VoronoiEvent ve = this._events.Pop();
-
-            if (ve.IsSite) ProcessSite(ve);
-            else ProcessParabola(ve);
-        }
-    }
-
-    private void ProcessSite(VoronoiEvent vEvent)
-    {
-        // If the beachline is empty insert a new parabola.
-        if(this._beachLine.IsEmpty())
-        {
-            this._beachLine.Insert(new ParabolaNode(vEvent.Point));
-            return;
-        }
-
-        // FIXME You were here.
-
-    }
-
-    private void ProcessParabola(VoronoiEvent vEvent)
-    {
-
-    }
-    
 }

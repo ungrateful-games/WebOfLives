@@ -261,11 +261,8 @@ public class DungeonPacker
         }
 
         vGen.CreateEdges();
-        VoronoiEvent currEvent;
-        while(vEvents.Count > 0)
-        {
-            currEvent = vEvents.Pop();
-        }
+
+       
 
     }
 
